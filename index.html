@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classroom Session Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Classroom Session Manager</h1>
+
+        <div class="status-display">
+            <h2 id="currentMode">Ready to Start</h2>
+            <div id="timerDisplay">00:00</div>
+        </div>
+
+        <div class="controls">
+            <button id="startButton" class="btn primary">Start Session</button>
+            <button id="pauseButton" class="btn" style="display: none;">Pause</button>
+            <button id="resetButton" class="btn">Reset</button>
+        </div>
+
+        <div class="mode-switcher">
+            <button id="switchToSessionBtn" class="btn mode-btn">Switch to Session</button>
+            <button id="switchToBreakBtn" class="btn mode-btn">Switch to Break</button>
+        </div>
+
+        <div class="override-controls">
+            <h3>Teacher Overrides</h3>
+            <div class="extend-time">
+                <input type="number" id="extendMinutesInput" value="5" min="1">
+                <button id="extendTimeBtn" class="btn secondary">Extend Current</button>
+            </div>
+            <button id="endCurrentBtn" class="btn danger">End Current Segment</button>
+        </div>
+
+        <div class="pre-session-checklist">
+            <h3>Pre-Session Checklist</h3>
+            <ul id="checklistItems">
+                <!-- Checklist items will be injected by JavaScript -->
+            </ul>
+            <button id="startSessionOverrideBtn" class="btn primary" style="display: none;">Start Session Anyway</button>
+        </div>
+
+        <hr> <!-- Separator for settings button -->
+        <button id="openSettingsBtn" class="btn">Settings</button>
+    </div>
+
+    <!-- Settings Modal/Section -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <h2>Settings</h2>
+
+            <div class="setting-group">
+                <label for="defaultSessionDuration">Default Session Duration (minutes):</label>
+                <input type="number" id="defaultSessionDuration" min="1">
+            </div>
+
+            <div class="setting-group">
+                <label for="defaultBreakDuration">Default Break Duration (minutes):</label>
+                <input type="number" id="defaultBreakDuration" min="1">
+            </div>
+
+            <div class="setting-group">
+                <h3>Manage Pre-Session Checklist</h3>
+                <ul id="editableChecklistItems">
+                    <!-- Editable checklist items will be injected by JavaScript -->
+                </ul>
+                <div class="add-checklist-item">
+                    <input type="text" id="newChecklistItemText" placeholder="New checklist item text">
+                    <button id="addChecklistItemBtn" class="btn secondary">Add Item</button>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button id="saveSettingsBtn" class="btn primary">Save Settings</button>
+                <button id="closeSettingsBtn" class="btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Message/Alert Modal -->
+    <div id="messageModal" class="modal">
+        <div class="modal-content message-modal-content">
+            <h3 id="messageModalTitle"></h3>
+            <p id="messageModalContent"></p>
+            <div class="modal-actions">
+                <button id="messageModalConfirmBtn" class="btn primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
