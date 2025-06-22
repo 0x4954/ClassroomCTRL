@@ -4,88 +4,154 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Classroom Session Manager</title>
-    <link rel="stylesheet" href="style.css">
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Link to external stylesheet -->
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Classroom Session Manager</h1>
+    <div class="container relative min-h-screen flex flex-col items-center justify-center p-4">
+        <!-- Settings Button - positioned absolutely within the container -->
+        <button id="openSettingsBtn" class="absolute top-4 right-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-full shadow-lg transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75">
+            ⚙️ Settings
+        </button>
 
-        <div class="status-display">
-            <h2 id="currentMode">Ready to Start</h2>
-            <div id="timerDisplay">00:00</div>
-        </div>
-
-        <div class="controls">
-            <button id="startButton" class="btn primary">Start Session</button>
-            <button id="pauseButton" class="btn" style="display: none;">Pause</button>
-            <button id="resetButton" class="btn">Reset</button>
-        </div>
-
-        <div class="mode-switcher">
-            <button id="switchToSessionBtn" class="btn mode-btn">Switch to Session</button>
-            <button id="switchToBreakBtn" class="btn mode-btn">Switch to Break</button>
-        </div>
-
-        <div class="override-controls">
-            <h3>Teacher Overrides</h3>
-            <div class="extend-time">
-                <input type="number" id="extendMinutesInput" value="5" min="1">
-                <button id="extendTimeBtn" class="btn secondary">Extend Current</button>
+        <!-- Main Session Display -->
+        <div class="main-display flex flex-col items-center justify-center w-full max-w-md bg-white rounded-lg shadow-xl p-6 mb-8 transform transition-all duration-300 hover:scale-105">
+            <h1 class="text-3xl font-extrabold text-gray-900 mb-4 text-center">Classroom Session</h1>
+            <p id="userIdDisplay" class="text-sm text-gray-600 mb-6 px-4 py-2 bg-gray-100 rounded-md truncate w-full text-center">
+                User ID: Loading...
+            </p>
+            <div class="w-full flex justify-center items-center mb-8">
+                <span id="currentSessionDisplay" class="text-5xl font-mono text-indigo-700 font-bold">00:00:00</span>
             </div>
-            <button id="endCurrentBtn" class="btn danger">End Current Segment</button>
+            <div class="controls flex space-x-4">
+                <button id="startBtn" class="btn btn-primary bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:-translate-y-1">Start</button>
+                <button id="pauseBtn" class="btn btn-secondary bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:-translate-y-1">Pause</button>
+                <button id="resetBtn" class="btn btn-danger bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:-translate-y-1">Reset</button>
+            </div>
         </div>
 
-        <div class="pre-session-checklist">
-            <h3>Pre-Session Checklist</h3>
-            <ul id="checklistItems">
-                </ul>
-            <button id="startSessionOverrideBtn" class="btn primary" style="display: none;">Start Session Anyway</button>
+        <!-- Session History Section -->
+        <div class="session-history w-full max-w-md bg-white rounded-lg shadow-xl p-6 transform transition-all duration-300 hover:scale-105">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Session History</h2>
+            <ul id="sessionHistoryList" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                <!-- Session entries will be dynamically added here -->
+            </ul>
         </div>
-
-        <hr> <button id="openSettingsBtn" class="btn">Settings</button>
     </div>
 
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <h2>Settings</h2>
-
-            <div class="setting-group">
-                <label for="defaultSessionDuration">Default Session Duration (minutes):</label>
-                <input type="number" id="defaultSessionDuration" min="1">
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-2xl p-8 w-full max-w-sm transform transition-all duration-300 scale-95 opacity-0">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">Settings</h3>
+            <div class="mb-4">
+                <label for="sessionNameInput" class="block text-gray-700 text-sm font-semibold mb-2">Session Name:</label>
+                <input type="text" id="sessionNameInput" class="form-input w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g., Math Class, Group Work">
             </div>
-
-            <div class="setting-group">
-                <label for="defaultBreakDuration">Default Break Duration (minutes):</label>
-                <input type="number" id="defaultBreakDuration" min="1">
+            <div class="mb-6">
+                <label for="sharingToggle" class="flex items-center justify-between text-gray-700 text-sm font-semibold cursor-pointer">
+                    Enable Public Sharing:
+                    <label class="switch">
+                        <input type="checkbox" id="sharingToggle">
+                        <span class="slider round"></span>
+                    </label>
+                </label>
             </div>
-
-            <div class="setting-group">
-                <h3>Manage Pre-Session Checklist</h3>
-                <ul id="editableChecklistItems">
-                    </ul>
-                <div class="add-checklist-item">
-                    <input type="text" id="newChecklistItemText" placeholder="New checklist item text">
-                    <button id="addChecklistItemBtn" class="btn secondary">Add Item</button>
-                </div>
-            </div>
-
-            <div class="modal-actions">
-                <button id="saveSettingsBtn" class="btn primary">Save Settings</button>
-                <button id="closeSettingsBtn" class="btn">Close</button>
+            <div class="flex justify-end space-x-3">
+                <button id="saveSettingsBtn" class="btn btn-primary bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">Save</button>
+                <button id="closeSettingsBtn" class="btn btn-secondary bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">Cancel</button>
             </div>
         </div>
     </div>
 
-    <div id="messageModal" class="modal">
-        <div class="modal-content message-modal-content">
-            <h3 id="messageModalTitle"></h3>
-            <p id="messageModalContent"></p>
-            <div class="modal-actions">
-                <button id="messageModalConfirmBtn" class="btn primary">OK</button>
-            </div>
+    <!-- Message Box Modal -->
+    <div id="messageBox" class="modal hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-2xl p-8 w-full max-w-xs text-center transform transition-all duration-300 scale-95 opacity-0">
+            <p id="messageBoxText" class="text-lg font-semibold text-gray-800 mb-6"></p>
+            <button id="messageBoxCloseBtn" class="btn btn-primary bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out">OK</button>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Include Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, addDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Pass Firebase and Firestore functions to the global scope or script.js via a setup function
+        window.firebaseInit = async () => {
+            try {
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+                if (!Object.keys(firebaseConfig).length) {
+                    console.error("Firebase config is missing. Cannot initialize Firebase.");
+                    return null;
+                }
+
+                const app = initializeApp(firebaseConfig);
+                const db = getFirestore(app);
+                const auth = getAuth(app);
+
+                let currentUserId;
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        console.log("Authenticated user ID:", currentUserId);
+                        document.getElementById('userIdDisplay').textContent = `User ID: ${currentUserId}`;
+                        // Call window.initApp after authentication and pass all necessary Firebase dependencies
+                        window.initApp(db, auth, currentUserId, appId, {
+                            getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, addDoc, serverTimestamp, orderBy
+                        });
+                    } else {
+                        console.log("No user signed in.");
+                        document.getElementById('userIdDisplay').textContent = 'User ID: Not authenticated';
+                        // Optionally, handle unauthenticated state (e.g., redirect to login)
+                    }
+                });
+
+                return { db, auth, getFirestore, doc, setDoc, onSnapshot, collection, query, addDoc, serverTimestamp, orderBy };
+
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                window.showMessage('Error initializing application. Please try again later.');
+                return null;
+            }
+        };
+
+        // Expose a function to show custom message box
+        window.showMessage = (message) => {
+            const messageBox = document.getElementById('messageBox');
+            const messageBoxText = document.getElementById('messageBoxText');
+            messageBoxText.textContent = message;
+            messageBox.classList.remove('hidden');
+            messageBox.querySelector('.modal-content').classList.add('scale-100', 'opacity-100');
+            messageBox.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0');
+        };
+
+        // Close message box event listener
+        document.getElementById('messageBoxCloseBtn').addEventListener('click', () => {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.querySelector('.modal-content').classList.remove('scale-100', 'opacity-100');
+            messageBox.querySelector('.modal-content').classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 300); // Allow time for transition
+        });
+
+        // Start Firebase initialization after the DOM is fully loaded
+        window.addEventListener('DOMContentLoaded', (event) => {
+            window.firebaseInit();
+        });
+    </script>
+    <!-- Link to main application script -->
+    <script src="script.js" type="module"></script>
 </body>
 </html>
