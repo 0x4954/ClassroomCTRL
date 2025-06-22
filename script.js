@@ -1,525 +1,313 @@
-// --- Configuration & State Management ---
-// Default values if nothing is found in localStorage
-const DEFAULT_SETTINGS = {
-    sessionDurationMins: 25,
-    breakDurationMins: 5,
-    // Add default modalMessage for each checklist item
-    checklistItems: [
-        { id: 'slides', text: 'Open presentation slides', completed: false, modalMessage: 'Please ensure your **presentation slides** are open and ready for display.' },
-        { id: 'audio', text: 'Check audio & microphone', completed: false, modalMessage: 'Verify that your **audio output and microphone** are working correctly for clear communication.' },
-        { id: 'handouts', text: 'Distribute handouts (if any)', completed: false, modalMessage: 'If you have any **handouts**, please distribute them to the students now.' },
-        { id: 'board', text: 'Write agenda on whiteboard', completed: false, modalMessage: 'Write today\'s session **agenda or key topics** on the whiteboard.' },
-    ]
-};
+// Ensure Firebase is initialized before the main app logic runs
+window.initApp = async (db, auth, userId, appId, firebaseFirestore) => {
+    // DOM Elements
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const currentSessionDisplay = document.getElementById('currentSessionDisplay');
+    const sessionHistoryList = document.getElementById('sessionHistoryList');
+    const openSettingsBtn = document.getElementById('openSettingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    const sessionNameInput = document.getElementById('sessionNameInput');
+    const sharingToggle = document.getElementById('sharingToggle');
+    const userIdDisplay = document.getElementById('userIdDisplay');
 
-let appSettings = {}; // This will hold our current loaded settings
+    let timerInterval;
+    let startTime;
+    let elapsedTime = 0;
+    let isRunning = false;
+    let isPublicSession = false; // Default to private
+    let currentSessionId = null;
+    let sessionName = "Unnamed Session"; // Default session name
 
-// --- DOM Elements ---
-const timerDisplay = document.getElementById('timerDisplay');
-const currentModeDisplay = document.getElementById('currentMode');
-const startButton = document.getElementById('startButton');
-const pauseButton = document.getElementById('pauseButton');
-const resetButton = document.getElementById('resetButton');
-const switchToSessionBtn = document.getElementById('switchToSessionBtn');
-const switchToBreakBtn = document.getElementById('switchToBreakBtn');
-const extendMinutesInput = document.getElementById('extendMinutesInput');
-const extendTimeBtn = document.getElementById('extendTimeBtn');
-const endCurrentBtn = document.getElementById('endCurrentBtn');
-const checklistItemsUl = document.getElementById('checklistItems');
-const startSessionOverrideBtn = document.getElementById('startSessionOverrideBtn');
+    // Helper function to show custom message box
+    const showMessage = (message) => {
+        window.showMessage(message);
+    };
 
-// Settings Modal Elements
-const openSettingsBtn = document.getElementById('openSettingsBtn');
-const settingsModal = document.getElementById('settingsModal');
-const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-const defaultSessionDurationInput = document.getElementById('defaultSessionDuration');
-const defaultBreakDurationInput = document.getElementById('defaultBreakDuration');
-const editableChecklistItemsUl = document.getElementById('editableChecklistItems');
-const newChecklistItemText = document.getElementById('newChecklistItemText');
-const addChecklistItemBtn = document.getElementById('addChecklistItemBtn');
-
-// Generic Message Modal Elements
-const messageModal = document.getElementById('messageModal');
-const messageModalTitle = document.getElementById('messageModalTitle');
-const messageModalContent = document.getElementById('messageModalContent');
-const messageModalConfirmBtn = document.getElementById('messageModalConfirmBtn');
-let messageModalCallback = null; // Function to execute when modal is confirmed
+    // Destructure Firestore functions from the passed object
+    const { doc, getDoc, setDoc, onSnapshot, collection, query, addDoc, serverTimestamp, orderBy } = firebaseFirestore;
 
 
-// --- State Variables ---
-let currentMode = 'ready'; // 'ready', 'session', 'break'
-let timeLeft = 0; // in seconds
-let timerInterval;
-let isPaused = false;
-let checklistInProgress = false; // Flag to indicate if checklist modal sequence is active
+    // Update the UI with the user ID
+    userIdDisplay.textContent = `User ID: ${userId}`;
 
-// --- Helper Functions ---
-function formatTime(seconds) {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-}
+    // Function to format time for display
+    function formatTime(ms) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
 
-// --- Local Storage Functions ---
-function loadSettings() {
-    const storedSettings = localStorage.getItem('classroomAppSettings');
-    if (storedSettings) {
-        appSettings = JSON.parse(storedSettings);
-        // Merge with defaults to ensure new properties are added
-        appSettings = { ...DEFAULT_SETTINGS, ...appSettings };
-        // Ensure checklist items have modalMessage, add if missing or update default
-        appSettings.checklistItems = appSettings.checklistItems.map(item => ({
-            ...item,
-            modalMessage: item.modalMessage || `Please confirm you have completed "**${item.text}**".`
-        }));
-
-    } else {
-        appSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); // Deep copy defaults
-    }
-    // For checklist on main display, ensure 'completed' status is reset when loaded for a new session
-    appSettings.checklistItems.forEach(item => item.completed = false);
-    console.log('Settings loaded:', appSettings);
-}
-
-function saveSettings() {
-    localStorage.setItem('classroomAppSettings', JSON.stringify(appSettings));
-    console.log('Settings saved:', appSettings);
-}
-
-// --- Generic Message Modal Functions ---
-function showMessageModal(title, message, callback = null, buttonText = "OK") {
-    messageModalTitle.innerHTML = title; // Use innerHTML to allow bold tags
-    messageModalContent.innerHTML = message; // Use innerHTML to allow bold tags
-    messageModalConfirmBtn.textContent = buttonText;
-    messageModalCallback = callback;
-    messageModal.classList.add('show');
-}
-
-function hideMessageModal() {
-    messageModal.classList.remove('show');
-    messageModalCallback = null; // Clear callback
-}
-
-// --- Checklist Management (Main Display) ---
-function renderChecklist(checklistData) {
-    checklistItemsUl.innerHTML = ''; // Clear existing items
-    checklistData.forEach(item => {
-        const li = document.createElement('li');
-        li.className = `checklist-item ${item.completed ? 'completed' : ''}`;
-        li.dataset.id = item.id; // Store ID for easy lookup
-
-        // The checkbox is only visual, actual completion is via modal
-        li.innerHTML = `
-            <label>
-                <input type="checkbox" class="checklist-checkbox" ${item.completed ? 'checked' : ''} disabled>
-                <span class="checkmark"></span>
-                ${item.text}
-            </label>
-        `;
-        checklistItemsUl.appendChild(li);
-    });
-    checkPreSessionReadiness();
-}
-
-function areAllChecklistItemsCompleted() {
-    return appSettings.checklistItems.every(item => item.completed);
-}
-
-function checkPreSessionReadiness() {
-    if (currentMode === 'ready' && !areAllChecklistItemsCompleted()) {
-        startSessionOverrideBtn.style.display = 'inline-block';
-        startButton.disabled = false; // Start button is always enabled to start checklist
-        startButton.textContent = 'Start Session'; // Text changed to imply checklist first
-        startButton.classList.remove('primary');
-        startButton.classList.add('btn');
-    } else {
-        startSessionOverrideBtn.style.display = 'none'; // No override needed if checklist is done
-        startButton.disabled = false; // Ensure it's enabled if all done
-        startButton.textContent = 'Start Session';
-        startButton.classList.remove('btn');
-        startButton.classList.add('primary');
-    }
-}
-
-// --- Sequential Checklist Modal Flow ---
-function triggerNextChecklistItemModal(startIndex = 0) {
-    // Hide the main timer/controls while checklist is in progress
-    document.querySelector('.status-display').style.display = 'none';
-    document.querySelector('.controls').style.display = 'none';
-    document.querySelector('.mode-switcher').style.display = 'none';
-    document.querySelector('.override-controls').style.display = 'none';
-    document.querySelector('.pre-session-checklist').style.display = 'block'; // Ensure checklist is visible
-
-    checklistInProgress = true;
-
-    // Find the first uncompleted item from startIndex
-    const firstUncompletedIndex = appSettings.checklistItems.findIndex((item, index) =>
-        index >= startIndex && !item.completed
-    );
-
-    if (firstUncompletedIndex !== -1) {
-        const currentItem = appSettings.checklistItems[firstUncompletedIndex];
-
-        showMessageModal(
-            `Pre-Session Task: ${currentItem.text}`,
-            currentItem.modalMessage,
-            () => { // Callback when user confirms this item
-                currentItem.completed = true; // Mark as completed
-                renderChecklist(appSettings.checklistItems); // Update main display
-
-                // Trigger next item in sequence
-                triggerNextChecklistItemModal(firstUncompletedIndex + 1);
-            },
-            "I'm Ready / Done!"
-        );
-    } else {
-        // All checklist items are completed
-        checklistInProgress = false;
-        hideMessageModal(); // Ensure modal is closed
-        checkPreSessionReadiness(); // Re-enable start button, it will be primary now
-        showMessageModal(
-            'Checklist Complete!',
-            'All pre-session tasks are completed. The class session will now begin.',
-            () => {
-                // Restore main display elements
-                document.querySelector('.status-display').style.display = 'block';
-                document.querySelector('.controls').style.display = 'block';
-                document.querySelector('.mode-switcher').style.display = 'block';
-                document.querySelector('.override-controls').style.display = 'block';
-                // Automatically start the session timer
-                setMode('session');
-            },
-            'Start Session' // Custom button text
-        );
-    }
-}
-
-
-// --- Timer Logic ---
-function updateDisplay() {
-    timerDisplay.textContent = formatTime(timeLeft);
-    currentModeDisplay.textContent = currentMode === 'session' ? 'Class Session' :
-                                   currentMode === 'break' ? 'Break Time' :
-                                   'Ready to Start';
-
-    if (currentMode === 'ready' || isPaused) {
-        startButton.style.display = 'inline-block';
-        pauseButton.style.display = 'none';
-    } else {
-        startButton.style.display = 'none';
-        pauseButton.style.display = 'inline-block';
-    }
-}
-
-function startTimer() {
-    // If in ready mode and checklist isn't done, initiate the checklist flow
-    if (currentMode === 'ready' && !areAllChecklistItemsCompleted() && !checklistInProgress) {
-        // Hide main elements, show only checklist area and start the sequence
-        triggerNextChecklistItemModal(0);
-        return; // Don't start timer yet, it will be started by the checklist sequence
+        return [hours, minutes, seconds]
+            .map(unit => unit < 10 ? '0' + unit : unit)
+            .join(':');
     }
 
-    // This part only runs if checklist is completed OR if currentMode is already session/break
-    if (timerInterval) clearInterval(timerInterval);
+    // Function to start the timer
+    function startTimer() {
+        if (isRunning) return; // Prevent multiple starts
+        isRunning = true;
+        startTime = Date.now() - elapsedTime; // Adjust start time for pauses
+        timerInterval = setInterval(() => {
+            elapsedTime = Date.now() - startTime;
+            currentSessionDisplay.textContent = formatTime(elapsedTime);
+        }, 1000); // Update every second
+        startBtn.disabled = true; // Disable start button
+        pauseBtn.disabled = false; // Enable pause button
+        resetBtn.disabled = false; // Enable reset button
 
-    isPaused = false;
-    updateDisplay();
+        // Save session start time if it's a new session
+        if (!currentSessionId) {
+            saveSession("started");
+        }
+    }
 
-    timerInterval = setInterval(() => {
-        if (timeLeft > 0) {
-            timeLeft--;
-        } else {
-            clearInterval(timerInterval);
-            timerInterval = null;
-            if (currentMode === 'session') {
-                showMessageModal(
-                    'Session Ended!',
-                    'Your class session has ended. The break time will now begin automatically.',
-                    () => { // Callback after user acknowledges
-                        setMode('break'); // Automatically start break
-                    },
-                    'OK, Start Break'
-                );
-            } else if (currentMode === 'break') {
-                showMessageModal(
-                    'Break Ended!',
-                    'Break time has ended. The app is now ready for the next session.',
-                    () => { // Callback after user acknowledges
-                        setMode('ready'); // Return to ready state
-                    },
-                    'OK, Ready'
-                );
+    // Function to pause the timer
+    function pauseTimer() {
+        if (!isRunning) return; // Only pause if running
+        isRunning = false;
+        clearInterval(timerInterval); // Stop the interval
+        startBtn.disabled = false; // Enable start button
+        pauseBtn.disabled = true; // Disable pause button
+        resetBtn.disabled = false; // Enable reset button
+        saveSession("paused"); // Save current state as paused
+    }
+
+    // Function to reset the timer
+    function resetTimer() {
+        if (currentSessionId && isRunning) {
+             saveSession("ended"); // Save final state if session was active
+        } else if (currentSessionId && !isRunning && elapsedTime > 0) {
+             saveSession("ended"); // Save final state if paused and had time
+        }
+
+        isRunning = false;
+        clearInterval(timerInterval); // Clear any running interval
+        elapsedTime = 0; // Reset elapsed time
+        currentSessionDisplay.textContent = "00:00:00"; // Reset display
+        startBtn.disabled = false; // Enable start button
+        pauseBtn.disabled = true; // Disable pause button
+        resetBtn.disabled = true; // Disable reset button
+        currentSessionId = null; // Clear current session ID
+
+    }
+
+    // Function to save session data to Firestore
+    async function saveSession(status) {
+        try {
+            const sessionData = {
+                name: sessionName,
+                duration: elapsedTime,
+                status: status, // 'started', 'paused', 'ended'
+                timestamp: serverTimestamp(),
+                userId: userId,
+                isPublic: isPublicSession
+            };
+
+            const collectionRef = getSessionCollectionRef(isPublicSession);
+
+            if (currentSessionId) {
+                // Update existing session
+                const sessionDocRef = doc(collectionRef, currentSessionId);
+                await setDoc(sessionDocRef, sessionData, { merge: true }); // Merge to avoid overwriting other fields
+                console.log(`Session ${status}: ${currentSessionId}`);
+            } else {
+                // Create new session
+                const docRef = await addDoc(collectionRef, sessionData);
+                currentSessionId = docRef.id;
+                console.log(`New session ${status} with ID: ${currentSessionId}`);
             }
+        } catch (e) {
+            console.error("Error saving session: ", e);
+            showMessage("Error saving session data.");
         }
-        updateDisplay();
-    }, 1000);
-}
-
-function pauseTimer() {
-    clearInterval(timerInterval);
-    timerInterval = null;
-    isPaused = true;
-    updateDisplay();
-}
-
-function resetTimer() {
-    pauseTimer();
-    setMode('ready'); // Go back to 'ready' state
-    timeLeft = 0;
-    updateDisplay();
-    // Reset checklist completed status for the next session
-    appSettings.checklistItems.forEach(item => item.completed = false);
-    renderChecklist(appSettings.checklistItems);
-    // Restore main display elements if they were hidden by checklist flow
-    document.querySelector('.status-display').style.display = 'block';
-    document.querySelector('.controls').style.display = 'block';
-    document.querySelector('.mode-switcher').style.display = 'block';
-    document.querySelector('.override-controls').style.display = 'block';
-    document.querySelector('.pre-session-checklist').style.display = 'block'; // Ensure checklist is visible
-    checklistInProgress = false; // Ensure flag is reset
-}
-
-function setMode(mode) {
-    currentMode = mode;
-    isPaused = false; // Always unpause when switching mode
-    if (mode === 'session') {
-        timeLeft = appSettings.sessionDurationMins * 60;
-    } else if (mode === 'break') {
-        timeLeft = appSettings.breakDurationMins * 60;
-    } else { // 'ready'
-        timeLeft = 0;
-        pauseTimer(); // Ensure timer is stopped
-    }
-    updateDisplay();
-    // Only auto-start timer if we're moving into a session or break,
-    // and not if we're just setting to 'ready'
-    if (mode !== 'ready') {
-        startTimer();
-    }
-}
-
-// --- Teacher Override Functions ---
-function extendTime() {
-    const minutesToAdd = parseInt(extendMinutesInput.value);
-    if (!isNaN(minutesToAdd) && minutesToAdd > 0) {
-        timeLeft += minutesToAdd * 60;
-        updateDisplay();
-        showMessageModal('Time Extended', `Added ${minutesToAdd} minutes to the current ${currentMode} time.`);
-    } else {
-        showMessageModal('Invalid Input', 'Please enter a valid positive number of minutes to extend.', null, 'Got It');
-    }
-}
-
-function endCurrentSegment() {
-    pauseTimer(); // Stop current timer
-    if (currentMode === 'session') {
-        showMessageModal(
-            'Session Ended Early',
-            'The current session has been ended. Switching to Break Time.',
-            () => { // User confirmed override
-                setMode('break');
-            },
-            'OK, Start Break'
-        );
-    } else if (currentMode === 'break') {
-        showMessageModal(
-            'Break Ended Early',
-            'The current break has been ended. Ready for the next session.',
-            () => { // User confirmed override
-                setMode('ready');
-            },
-            'OK, Ready'
-        );
-    } else {
-        showMessageModal('No Active Segment', 'There is no active session or break to end.');
-    }
-}
-
-// --- Settings UI Logic ---
-function openSettings() {
-    settingsModal.classList.add('show');
-    // Populate settings inputs with current values
-    defaultSessionDurationInput.value = appSettings.sessionDurationMins;
-    defaultBreakDurationInput.value = appSettings.breakDurationMins;
-    renderEditableChecklist();
-}
-
-function closeSettings() {
-    settingsModal.classList.remove('show');
-}
-
-function saveCurrentSettings() {
-    const newSessionDuration = parseInt(defaultSessionDurationInput.value);
-    const newBreakDuration = parseInt(defaultBreakDurationInput.value);
-
-    if (isNaN(newSessionDuration) || newSessionDuration <= 0 ||
-        isNaN(newBreakDuration) || newBreakDuration <= 0) {
-        showMessageModal('Invalid Settings', 'Please enter valid positive numbers for session and break durations.', null, 'Fix It');
-        return;
     }
 
-    appSettings.sessionDurationMins = newSessionDuration;
-    appSettings.breakDurationMins = newBreakDuration;
-    // Checklist items are managed directly via renderEditableChecklist / delete / add functions
-
-    saveSettings(); // Save to localStorage
-    showMessageModal('Settings Saved!', 'Your application settings have been successfully updated.', () => {
-        closeSettings();
-        // Re-render main checklist if we're in ready mode, to reflect any changes
-        if (currentMode === 'ready') {
-            appSettings.checklistItems.forEach(item => item.completed = false); // Reset completion status for next session
-            renderChecklist(appSettings.checklistItems);
+    // Determine the Firestore path based on sharing settings
+    const getSessionCollectionRef = (isPublic) => {
+        if (isPublic) {
+            return collection(db, `artifacts/${appId}/public/data/sessions`);
+        } else {
+            return collection(db, `artifacts/${appId}/users/${userId}/sessions`);
         }
+    };
+
+    // Function to load and display session history
+    async function loadSessionHistory() {
+        try {
+            sessionHistoryList.innerHTML = ''; // Clear existing list
+            // Fetch both private and public sessions for the current user to display history
+            // Note: For actual multi-user public display, you'd likely have a separate public sessions view.
+            // Here, we just display what the current user has access to or created.
+
+            const privateSessionsQuery = query(
+                getSessionCollectionRef(false),
+                // orderBy("timestamp", "desc") // Removed orderBy to avoid index issues
+            );
+
+            // Listen for real-time updates for private sessions
+            onSnapshot(privateSessionsQuery, (snapshot) => {
+                const privateSessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Process and display only private sessions, then merge with public if needed
+                renderSessionHistory(privateSessions.sort((a, b) => b.timestamp?.toDate() - a.timestamp?.toDate())); // Client-side sort
+            }, (error) => {
+                console.error("Error listening to private sessions: ", error);
+                showMessage("Error loading private session history.");
+            });
+
+            // Listen for real-time updates for public sessions (if feature is enabled/relevant for display)
+            // For simplicity, we'll assume a user only sees public sessions they created,
+            // or we'd need more complex logic to show *all* public sessions globally.
+            // For this app, public means *this user's* sessions are public.
+            if (isPublicSession) { // Only listen to public if the setting is on for the user
+                 const publicSessionsQuery = query(
+                    getSessionCollectionRef(true),
+                    // orderBy("timestamp", "desc") // Removed orderBy to avoid index issues
+                );
+                 onSnapshot(publicSessionsQuery, (snapshot) => {
+                    const publicSessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    // This might cause duplicate entries if a session is both private and public
+                    // For this simple app, we're assuming a session is either one or the other.
+                    renderSessionHistory(publicSessions.sort((a, b) => b.timestamp?.toDate() - a.timestamp?.toDate())); // Client-side sort
+                }, (error) => {
+                    console.error("Error listening to public sessions: ", error);
+                    showMessage("Error loading public session history.");
+                });
+            }
+
+
+        } catch (e) {
+            console.error("Error loading session history: ", e);
+            showMessage("Error loading session history.");
+        }
+    }
+
+    // Helper to render sessions to the UI, avoiding duplicates
+    function renderSessionHistory(sessions) {
+        // Simple deduplication based on session ID and update existing entries
+        const existingSessionIds = new Set(Array.from(sessionHistoryList.children).map(li => li.dataset.sessionId));
+        const fragment = document.createDocumentFragment();
+
+        sessions.forEach(session => {
+            const formattedDuration = formatTime(session.duration || 0);
+            const date = session.timestamp ? new Date(session.timestamp.toDate()).toLocaleString() : 'N/A';
+
+            let listItem = document.querySelector(`li[data-session-id="${session.id}"]`);
+            if (listItem) {
+                // Update existing item
+                listItem.querySelector('.session-duration').textContent = formattedDuration;
+                listItem.querySelector('.session-name').textContent = session.name;
+                listItem.querySelector('.session-date').textContent = date;
+                listItem.querySelector('.session-status').textContent = `Status: ${session.status}`;
+            } else {
+                // Create new item
+                listItem = document.createElement('li');
+                listItem.dataset.sessionId = session.id; // Store session ID for updates
+
+                listItem.classList.add('flex', 'flex-col', 'sm:flex-row', 'justify-between', 'items-start', 'sm:items-center', 'bg-gray-100', 'p-3', 'rounded-lg', 'shadow-sm', 'text-gray-700', 'border-l-5', 'border-indigo-500', 'mb-2', 'transition-all', 'duration-200', 'ease-in-out');
+
+                listItem.innerHTML = `
+                    <div class="session-info flex-grow">
+                        <span class="session-name font-semibold text-lg">${session.name}</span>
+                        <span class="text-sm text-gray-500 ml-2 session-status">Status: ${session.status}</span>
+                        <p class="session-date text-xs text-gray-500">${date}</p>
+                    </div>
+                    <div class="flex items-center space-x-2 mt-2 sm:mt-0">
+                        <span class="session-duration text-indigo-600 font-bold text-xl">${formattedDuration}</span>
+                    </div>
+                `;
+                fragment.appendChild(listItem);
+            }
+        });
+
+        // Add new items to the list at the top to reflect reverse chronological order
+        sessionHistoryList.prepend(fragment);
+    }
+
+
+    // Event Listeners for main controls
+    startBtn.addEventListener('click', startTimer);
+    pauseBtn.addEventListener('click', pauseTimer);
+    resetBtn.addEventListener('click', resetTimer);
+
+    // Event Listeners for Settings Modal
+    openSettingsBtn.addEventListener('click', () => {
+        // Load current settings from potentially saved user preferences or defaults
+        sessionNameInput.value = sessionName;
+        sharingToggle.checked = isPublicSession;
+        settingsModal.classList.remove('hidden');
+        settingsModal.querySelector('.modal-content').classList.add('scale-100', 'opacity-100');
+        settingsModal.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0');
     });
-}
 
-function renderEditableChecklist() {
-    editableChecklistItemsUl.innerHTML = '';
-    appSettings.checklistItems.forEach(item => {
-        const li = document.createElement('li');
-        li.dataset.id = item.id;
-        li.innerHTML = `
-            <span>${item.text}</span>
-            <button class="delete-btn">Delete</button>
-        `;
-        editableChecklistItemsUl.appendChild(li);
+    closeSettingsBtn.addEventListener('click', () => {
+        settingsModal.querySelector('.modal-content').classList.remove('scale-100', 'opacity-100');
+        settingsModal.querySelector('.modal-content').classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            settingsModal.classList.add('hidden');
+        }, 300); // Allow time for transition
     });
-}
 
-function addChecklistItem() {
-    const newItemText = newChecklistItemText.value.trim();
-    if (newItemText) {
-        const newItem = {
-            id: `item-${Date.now()}`, // Simple unique ID
-            text: newItemText,
-            completed: false, // Always start as not completed
-            modalMessage: `Please confirm you have completed "**${newItemText}**".` // Default modal message with bolding
-        };
-        appSettings.checklistItems.push(newItem);
-        newChecklistItemText.value = ''; // Clear input
-        renderEditableChecklist();
-        saveSettings();
-        showMessageModal('Item Added', `"${newItemText}" has been added to your checklist.`);
-    } else {
-        showMessageModal('Input Required', 'Please enter text for the new checklist item.', null, 'OK');
-    }
-}
+    saveSettingsBtn.addEventListener('click', async () => {
+        sessionName = sessionNameInput.value.trim() || "Unnamed Session";
+        const previousPublicState = isPublicSession;
+        isPublicSession = sharingToggle.checked;
 
-function deleteChecklistItem(id) {
-    // Show a confirmation modal before deleting
-    showMessageModal(
-        'Confirm Deletion',
-        'Are you sure you want to delete this checklist item? This cannot be undone.',
-        () => { // Callback if user confirms deletion
-            appSettings.checklistItems = appSettings.checklistItems.filter(item => item.id !== id);
-            renderEditableChecklist();
-            saveSettings();
-            showMessageModal('Item Deleted', 'The checklist item has been removed.');
-        },
-        'Yes, Delete' // Button text for confirmation
-    );
-}
+        // If sharing state changed, we might need to re-save the current session
+        // or ensure future sessions use the new path.
+        if (currentSessionId && previousPublicState !== isPublicSession) {
+            await saveSession(isRunning ? "started" : (elapsedTime > 0 ? "paused" : "ended"));
+            // Reload history to reflect potential path change (e.g., from private to public collection)
+            loadSessionHistory();
+        }
 
-// --- Event Listeners ---
-startButton.addEventListener('click', startTimer); // This now triggers checklist sequence or timer directly
-pauseButton.addEventListener('click', pauseTimer);
-resetButton.addEventListener('click', resetTimer);
-switchToSessionBtn.addEventListener('click', () => {
-    // Manually switching to session/break should bypass checklist
-    setMode('session');
-    // Ensure display elements are visible if they were hidden
-    document.querySelector('.status-display').style.display = 'block';
-    document.querySelector('.controls').style.display = 'block';
-    document.querySelector('.mode-switcher').style.display = 'block';
-    document.querySelector('.override-controls').style.display = 'block';
-    document.querySelector('.pre-session-checklist').style.display = 'block';
-    hideMessageModal(); // Close any open checklist modal
-    checklistInProgress = false; // Reset flag
-});
-switchToBreakBtn.addEventListener('click', () => {
-    setMode('break');
-    // Ensure display elements are visible if they were hidden
-    document.querySelector('.status-display').style.display = 'block';
-    document.querySelector('.controls').style.display = 'block';
-    document.querySelector('.mode-switcher').style.display = 'block';
-    document.querySelector('.override-controls').style.display = 'block';
-    document.querySelector('.pre-session-checklist').style.display = 'block';
-    hideMessageModal(); // Close any open checklist modal
-    checklistInProgress = false; // Reset flag
-});
-extendTimeBtn.addEventListener('click', extendTime);
-endCurrentBtn.addEventListener('click', endCurrentSegment);
+        // Save preferences to Firestore (e.g., in a user-specific document)
+        try {
+            const userPreferencesRef = doc(db, `artifacts/${appId}/users/${userId}/preferences/settings`);
+            await setDoc(userPreferencesRef, {
+                sessionName: sessionName,
+                isPublicSession: isPublicSession,
+                lastUpdated: serverTimestamp()
+            }, { merge: true });
+            showMessage("Settings saved successfully!");
+        } catch (e) {
+            console.error("Error saving preferences: ", e);
+            showMessage("Error saving settings.");
+        }
 
-// Main checklist toggle - REMOVED direct interaction to force sequential modal flow
-// The checkboxes are now purely visual feedback and disabled.
-checklistItemsUl.addEventListener('change', (event) => {
-    // This listener is now effectively disabled by `disabled` attribute on checkbox
-    // Any attempt to click an unchecked box will do nothing.
-    // Completion is solely through the modal sequence.
-});
+        settingsModal.querySelector('.modal-content').classList.remove('scale-100', 'opacity-100');
+        settingsModal.querySelector('.modal-content').classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            settingsModal.classList.add('hidden');
+        }, 300); // Allow time for transition
+    });
 
-startSessionOverrideBtn.addEventListener('click', () => {
-    if (currentMode === 'ready') {
-        showMessageModal(
-            'Override Checklist',
-            'You are about to start the session without completing the checklist. Proceed?',
-            () => { // User confirmed override
-                // Restore main display elements
-                document.querySelector('.status-display').style.display = 'block';
-                document.querySelector('.controls').style.display = 'block';
-                document.querySelector('.mode-switcher').style.display = 'block';
-                document.querySelector('.override-controls').style.display = 'block';
-                document.querySelector('.pre-session-checklist').style.display = 'block'; // Show checklist area
-                hideMessageModal(); // Close override confirmation modal
-
-                setMode('session');
-                // Also mark all checklist items as completed if overridden
-                appSettings.checklistItems.forEach(item => item.completed = true);
-                renderChecklist(appSettings.checklistItems);
-                checklistInProgress = false; // Reset flag
-            },
-            'Yes, Start Session'
-        );
-    }
-});
-
-// Settings Event Listeners
-openSettingsBtn.addEventListener('click', openSettings);
-closeSettingsBtn.addEventListener('click', closeSettings);
-saveSettingsBtn.addEventListener('click', saveCurrentSettings);
-addChecklistItemBtn.addEventListener('click', addChecklistItem);
-
-editableChecklistItemsUl.addEventListener('click', (event) => {
-    if (event.target.classList.contains('delete-btn')) {
-        const listItem = event.target.closest('li');
-        if (listItem) {
-            deleteChecklistItem(listItem.dataset.id);
+    // Load user preferences on app start
+    async function loadUserPreferences() {
+        try {
+            const userPreferencesRef = doc(db, `artifacts/${appId}/users/${userId}/preferences/settings`);
+            const docSnap = await getDoc(userPreferencesRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                sessionName = data.sessionName || "Unnamed Session";
+                isPublicSession = data.isPublicSession || false;
+                sessionNameInput.value = sessionName;
+                sharingToggle.checked = isPublicSession;
+            }
+        } catch (e) {
+            console.error("Error loading user preferences: ", e);
+            // Continue without preferences, using defaults
         }
     }
-});
 
-// Generic message modal confirm button listener
-messageModalConfirmBtn.addEventListener('click', () => {
-    // Execute the stored callback first
-    if (messageModalCallback) {
-        messageModalCallback();
-    }
-    // Only hide the modal if the callback didn't trigger a new modal (e.g., for checklist sequence)
-    // or if the checklist sequence is not active. This prevents the modal from closing too early
-    // during a multi-modal checklist flow.
-    if (!checklistInProgress) {
-        hideMessageModal();
-    }
-});
+    // Initial setup
+    pauseBtn.disabled = true; // Pause button is disabled initially
+    resetBtn.disabled = true; // Reset button is disabled initially
 
-
-// --- Initialization ---
-function initializeApp() {
-    loadSettings(); // Load settings from localStorage first
-    updateDisplay();
-    renderChecklist(appSettings.checklistItems); // Render main checklist with loaded items
-    checkPreSessionReadiness();
-}
-
-initializeApp();
+    // Load preferences and then session history
+    await loadUserPreferences();
+    loadSessionHistory();
+};

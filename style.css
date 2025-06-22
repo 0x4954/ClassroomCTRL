@@ -1,349 +1,280 @@
+/* Custom CSS for Classroom Session Manager */
+
+/* Import Inter font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Inter', sans-serif;
+    @apply bg-gradient-to-br from-indigo-500 to-purple-600 text-gray-900;
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background-color: #f4f7f6;
     margin: 0;
-    color: #333;
 }
 
 .container {
-    background-color: #ffffff;
-    padding: 30px;
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    text-align: center;
-    width: 90%;
-    max-width: 600px;
+    @apply relative bg-gray-50 p-8 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col items-center;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.8s ease-out;
 }
 
-h1, h2, h3 {
-    color: #2c3e50;
-    margin-bottom: 15px;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.status-display {
-    background-color: #ecf0f1;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 25px;
+.main-display {
+    @apply bg-white p-8 rounded-lg shadow-lg text-center;
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
 }
 
-#currentMode {
-    font-size: 1.5em;
-    font-weight: bold;
-    margin-bottom: 10px;
+.main-display:hover {
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+    transform: translateY(-5px) scale(1.02);
 }
 
-#timerDisplay {
-    font-size: 4em;
-    font-weight: bold;
-    color: #34495e;
-    font-variant-numeric: tabular-nums; /* Ensures fixed width for digits */
+.session-history {
+    @apply bg-white p-6 rounded-lg shadow-lg mt-8 w-full;
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
 }
 
-.btn {
-    padding: 12px 25px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1em;
-    margin: 5px;
-    transition: background-color 0.2s ease, transform 0.1s ease;
+.session-history:hover {
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+    transform: translateY(-5px) scale(1.02);
 }
 
-.btn:hover {
-    transform: translateY(-2px);
+h1 {
+    @apply text-4xl font-extrabold text-indigo-800 mb-6;
 }
 
-.btn:active {
-    transform: translateY(0);
+h2 {
+    @apply text-2xl font-bold text-gray-800 mb-4;
 }
 
-.btn.primary {
-    background-color: #28a745; /* Green */
-    color: white;
-}
-.btn.primary:hover {
-    background-color: #218838;
+#currentSessionDisplay {
+    @apply text-6xl font-mono font-bold text-indigo-700;
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.btn.secondary {
-    background-color: #007bff; /* Blue */
-    color: white;
-}
-.btn.secondary:hover {
-    background-color: #0056b3;
+.controls button {
+    @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300 ease-in-out transform;
+    min-width: 120px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
-.btn.danger {
-    background-color: #dc3545; /* Red */
-    color: white;
-}
-.btn.danger:hover {
-    background-color: #c82333;
+.btn-primary {
+    @apply bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75;
 }
 
-.btn.mode-btn {
-    background-color: #6c757d; /* Grey */
-    color: white;
-}
-.btn.mode-btn:hover {
-    background-color: #5a6268;
+.btn-secondary {
+    @apply bg-gray-300 text-gray-800 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75;
 }
 
-.controls, .mode-switcher, .override-controls, .pre-session-checklist {
-    margin-bottom: 20px;
-    border-top: 1px solid #eee;
-    padding-top: 20px;
+.btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75;
 }
 
-.extend-time {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 10px;
+.btn-action {
+    @apply bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75;
 }
 
-#extendMinutesInput {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    width: 60px;
-    text-align: center;
-    font-size: 1em;
-    margin-right: 10px;
-}
-
-.pre-session-checklist ul {
-    list-style: none;
-    padding: 0;
-}
-
-.pre-session-checklist li {
-    background-color: #f8f9fa;
-    padding: 10px;
+#sessionHistoryList li {
+    @apply flex justify-between items-center bg-gray-100 p-3 rounded-lg shadow-sm text-gray-700;
+    border-left: 5px solid #6366f1; /* Indigo-500 */
     margin-bottom: 8px;
-    border-radius: 5px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border: 1px solid #e9ecef;
+    transition: all 0.2s ease-in-out;
 }
 
-.pre-session-checklist li.completed {
-    background-color: #d4edda;
-    color: #155724;
-    text-decoration: line-through;
-    border-color: #c3e6cb;
+#sessionHistoryList li:hover {
+    @apply bg-gray-200 shadow-md;
+    transform: translateX(5px);
 }
 
-.checklist-checkbox {
-    cursor: pointer;
-    width: 20px;
-    height: 20px;
+#sessionHistoryList .session-info span {
+    @apply font-medium;
 }
 
-/* Hide the native checkbox and create a custom one */
-.checklist-item label {
-    position: relative;
-    padding-left: 30px;
-    cursor: pointer;
-    user-select: none; /* Prevent text selection */
-    text-align: left; /* Align text within label */
-    flex-grow: 1; /* Allow label to take available space */
+#sessionHistoryList .session-duration {
+    @apply text-indigo-600 font-bold;
 }
 
-.checklist-item label input[type="checkbox"] {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
+#sessionHistoryList .session-date {
+    @apply text-xs text-gray-500;
 }
 
-.checkmark {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 20px;
-    width: 20px;
-    background-color: #eee;
-    border-radius: 3px;
-}
-
-.checklist-item label input:checked ~ .checkmark {
-    background-color: #28a745;
-}
-
-.checkmark:after {
-    content: "";
-    position: absolute;
-    display: none;
-}
-
-.checklist-item label input:checked ~ .checkmark:after {
-    display: block;
-}
-
-.checklist-item label .checkmark:after {
-    left: 7px;
-    top: 3px;
-    width: 5px;
-    height: 10px;
-    border: solid white;
-    border-width: 0 3px 3px 0;
-    transform: rotate(45deg);
-}
-
-.checklist-item.completed label .checkmark {
-    background-color: #28a745;
-}
-.checklist-item.completed label .checkmark:after {
-    display: block;
-}
-
-/* --- Modal Styles (Generic for settings and message) --- */
+/* Modal Styling */
 .modal {
-    display: none; /* Hidden by default */
-    position: fixed; /* Stay in place */
-    z-index: 1000; /* Sit on top of everything */
-    left: 0;
-    top: 0;
-    width: 100%; /* Full width */
-    height: 100%; /* Full height */
-    overflow: auto; /* Enable scroll if needed */
-    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
-    justify-content: center;
-    align-items: center;
-    padding: 20px; /* Add some padding for smaller screens */
-    box-sizing: border-box; /* Include padding in width/height */
-}
-
-.modal.show {
-    display: flex; /* Show when 'show' class is added */
+    @apply flex items-center justify-center;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 .modal-content {
-    background-color: #fefefe;
-    padding: 30px;
-    border: 1px solid #888;
-    border-radius: 10px;
-    width: 90%; /* Responsive width */
-    max-width: 500px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    @apply bg-white p-8 rounded-lg shadow-xl w-full max-w-md;
+    border-radius: 15px;
+    animation: slideIn 0.4s ease-out forwards;
+}
+
+.modal.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+.modal.hidden .modal-content {
+    transform: translateY(-50px) scale(0.8);
+    opacity: 0;
+}
+
+.modal-content.scale-100 {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+.modal-content.scale-95 {
+    transform: translateY(-20px) scale(0.95);
+    opacity: 0;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+
+/* Form input styling */
+.form-input {
+    @apply block w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500;
+}
+
+/* Toggle Switch Styling */
+.switch {
     position: relative;
-    text-align: left; /* Align content inside modal to left */
+    display: inline-block;
+    width: 48px;
+    height: 28px;
 }
 
-.modal-content h2 {
-    text-align: center;
-    margin-bottom: 25px;
-    color: #2c3e50;
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
 }
 
-/* Specific styles for the generic message modal */
-.message-modal-content {
-    max-width: 400px; /* Slightly smaller for simple messages */
-    text-align: center;
-}
-
-#messageModalTitle {
-    color: #2c3e50;
-    margin-bottom: 15px;
-    font-size: 1.8em;
-}
-
-#messageModalContent {
-    font-size: 1.1em;
-    margin-bottom: 25px;
-    line-height: 1.5;
-    text-align: center; /* Center message content */
-}
-
-.setting-group {
-    margin-bottom: 20px;
-}
-
-.setting-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: bold;
-    color: #34495e;
-}
-
-.setting-group input[type="number"],
-.setting-group input[type="text"] {
-    width: calc(100% - 20px); /* Adjust for padding */
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    font-size: 1em;
-}
-
-#editableChecklistItems {
-    list-style: none;
-    padding: 0;
-    max-height: 200px; /* Scroll for many items */
-    overflow-y: auto;
-    border: 1px solid #eee;
-    border-radius: 5px;
-    padding-top: 5px;
-}
-
-#editableChecklistItems li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 10px;
-    border-bottom: 1px solid #f0f0f0;
-}
-#editableChecklistItems li:last-child {
-    border-bottom: none;
-}
-
-#editableChecklistItems li span {
-    flex-grow: 1; /* Allows text to take up available space */
-    text-align: left; /* Ensure text is left-aligned in editable list */
-}
-
-#editableChecklistItems .delete-btn {
-    background-color: #dc3545;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 4px;
+.slider {
+    position: absolute;
     cursor: pointer;
-    font-size: 0.8em;
-    margin-left: 10px;
-    flex-shrink: 0; /* Prevent button from shrinking */
-}
-#editableChecklistItems .delete-btn:hover {
-    background-color: #c82333;
-}
-
-.add-checklist-item {
-    display: flex;
-    gap: 10px;
-    margin-top: 15px;
-}
-.add-checklist-item input {
-    flex-grow: 1;
-}
-.add-checklist-item button {
-    white-space: nowrap; /* Prevent button text from wrapping */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    -webkit-transition: .4s;
+    transition: .4s;
+    border-radius: 28px; /* Adjusted to match height for perfect roundedness */
 }
 
-.modal-actions {
-    text-align: right;
-    margin-top: 30px;
-    border-top: 1px solid #eee;
-    padding-top: 20px;
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    -webkit-transition: .4s;
+    transition: .4s;
+    border-radius: 50%;
 }
 
-.modal-actions button {
-    margin-left: 10px; /* Space between buttons */
+input:checked + .slider {
+    background-color: #6366f1; /* Indigo-500 */
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px #6366f1;
+}
+
+input:checked + .slider:before {
+    -webkit-transform: translateX(20px); /* Adjusted for new width */
+    -ms-transform: translateX(20px);
+    transform: translateX(20px);
+}
+
+/* Rounded sliders */
+.slider.round {
+    border-radius: 28px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .container {
+        padding: 1rem;
+    }
+
+    h1 {
+        font-size: 2.5rem;
+    }
+
+    #currentSessionDisplay {
+        font-size: 3.5rem;
+    }
+
+    .controls {
+        flex-direction: column;
+        width: 100%;
+        gap: 1rem;
+    }
+
+    .controls button {
+        width: 100%;
+        padding: 0.75rem 1.5rem;
+    }
+
+    .main-display, .session-history {
+        padding: 1.5rem;
+    }
+
+    .modal-content {
+        padding: 1.5rem;
+    }
 }
