@@ -1,5 +1,30 @@
-// Ensure Firebase is initialized before the main app logic runs
-window.initApp = async (db, auth, userId, appId, firebaseFirestore) => {
+// Import Firebase SDKs
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+// Helper function to show custom message box (exposed globally)
+window.showMessage = (message) => {
+    const messageBox = document.getElementById('messageBox');
+    const messageBoxText = document.getElementById('messageBoxText');
+    messageBoxText.textContent = message;
+    messageBox.classList.remove('hidden');
+    messageBox.querySelector('.modal-content').classList.add('scale-100', 'opacity-100');
+    messageBox.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0');
+};
+
+// Close message box event listener (exposed globally)
+document.getElementById('messageBoxCloseBtn').addEventListener('click', () => {
+    const messageBox = document.getElementById('messageBox');
+    messageBox.querySelector('.modal-content').classList.remove('scale-100', 'opacity-100');
+    messageBox.querySelector('.modal-content').classList.add('scale-95', 'opacity-0');
+    setTimeout(() => {
+        messageBox.classList.add('hidden');
+    }, 300); // Allow time for transition
+});
+
+// Main application initialization function
+async function initApp(db, auth, userId, appId) {
     // DOM Elements
     const startBtn = document.getElementById('startBtn');
     const pauseBtn = document.getElementById('pauseBtn');
@@ -21,15 +46,6 @@ window.initApp = async (db, auth, userId, appId, firebaseFirestore) => {
     let isPublicSession = false; // Default to private
     let currentSessionId = null;
     let sessionName = "Unnamed Session"; // Default session name
-
-    // Helper function to show custom message box
-    const showMessage = (message) => {
-        window.showMessage(message);
-    };
-
-    // Destructure Firestore functions from the passed object
-    const { doc, getDoc, setDoc, onSnapshot, collection, query, addDoc, serverTimestamp, orderBy } = firebaseFirestore;
-
 
     // Update the UI with the user ID
     userIdDisplay.textContent = `User ID: ${userId}`;
@@ -92,8 +108,16 @@ window.initApp = async (db, auth, userId, appId, firebaseFirestore) => {
         pauseBtn.disabled = true; // Disable pause button
         resetBtn.disabled = true; // Disable reset button
         currentSessionId = null; // Clear current session ID
-
     }
+
+    // Determine the Firestore path based on sharing settings
+    const getSessionCollectionRef = (isPublic) => {
+        if (isPublic) {
+            return collection(db, `artifacts/${appId}/public/data/sessions`);
+        } else {
+            return collection(db, `artifacts/${appId}/users/${userId}/sessions`);
+        }
+    };
 
     // Function to save session data to Firestore
     async function saveSession(status) {
@@ -122,76 +146,61 @@ window.initApp = async (db, auth, userId, appId, firebaseFirestore) => {
             }
         } catch (e) {
             console.error("Error saving session: ", e);
-            showMessage("Error saving session data.");
+            window.showMessage("Error saving session data.");
         }
     }
-
-    // Determine the Firestore path based on sharing settings
-    const getSessionCollectionRef = (isPublic) => {
-        if (isPublic) {
-            return collection(db, `artifacts/${appId}/public/data/sessions`);
-        } else {
-            return collection(db, `artifacts/${appId}/users/${userId}/sessions`);
-        }
-    };
 
     // Function to load and display session history
     async function loadSessionHistory() {
         try {
-            sessionHistoryList.innerHTML = ''; // Clear existing list
-            // Fetch both private and public sessions for the current user to display history
-            // Note: For actual multi-user public display, you'd likely have a separate public sessions view.
-            // Here, we just display what the current user has access to or created.
+            // Clear existing list elements and re-add them based on new data to prevent duplicates
+            // This approach is fine for smaller lists; for very large lists,
+            // a more sophisticated diffing algorithm might be needed.
+            sessionHistoryList.innerHTML = '';
 
             const privateSessionsQuery = query(
-                getSessionCollectionRef(false),
-                // orderBy("timestamp", "desc") // Removed orderBy to avoid index issues
+                getSessionCollectionRef(false)
             );
 
             // Listen for real-time updates for private sessions
             onSnapshot(privateSessionsQuery, (snapshot) => {
                 const privateSessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Process and display only private sessions, then merge with public if needed
                 renderSessionHistory(privateSessions.sort((a, b) => b.timestamp?.toDate() - a.timestamp?.toDate())); // Client-side sort
             }, (error) => {
                 console.error("Error listening to private sessions: ", error);
-                showMessage("Error loading private session history.");
+                window.showMessage("Error loading private session history.");
             });
 
-            // Listen for real-time updates for public sessions (if feature is enabled/relevant for display)
-            // For simplicity, we'll assume a user only sees public sessions they created,
-            // or we'd need more complex logic to show *all* public sessions globally.
-            // For this app, public means *this user's* sessions are public.
-            if (isPublicSession) { // Only listen to public if the setting is on for the user
+            if (isPublicSession) {
                  const publicSessionsQuery = query(
-                    getSessionCollectionRef(true),
-                    // orderBy("timestamp", "desc") // Removed orderBy to avoid index issues
+                    getSessionCollectionRef(true)
                 );
                  onSnapshot(publicSessionsQuery, (snapshot) => {
                     const publicSessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // This might cause duplicate entries if a session is both private and public
-                    // For this simple app, we're assuming a session is either one or the other.
+                    // This will display public sessions. Be mindful of potential duplicates if a session
+                    // switches from private to public or vice-versa and is listened to by both queries.
+                    // For simplicity, this app assumes a session is created either private or public.
                     renderSessionHistory(publicSessions.sort((a, b) => b.timestamp?.toDate() - a.timestamp?.toDate())); // Client-side sort
                 }, (error) => {
                     console.error("Error listening to public sessions: ", error);
-                    showMessage("Error loading public session history.");
+                    window.showMessage("Error loading public session history.");
                 });
             }
 
-
         } catch (e) {
             console.error("Error loading session history: ", e);
-            showMessage("Error loading session history.");
+            window.showMessage("Error loading session history.");
         }
     }
 
-    // Helper to render sessions to the UI, avoiding duplicates
+    // Helper to render sessions to the UI, avoiding duplicates and updating existing
     function renderSessionHistory(sessions) {
-        // Simple deduplication based on session ID and update existing entries
-        const existingSessionIds = new Set(Array.from(sessionHistoryList.children).map(li => li.dataset.sessionId));
+        // Keep track of rendered session IDs to avoid re-rendering
+        const renderedSessionIds = new Set();
         const fragment = document.createDocumentFragment();
 
         sessions.forEach(session => {
+            renderedSessionIds.add(session.id);
             const formattedDuration = formatTime(session.duration || 0);
             const date = session.timestamp ? new Date(session.timestamp.toDate()).toLocaleString() : 'N/A';
 
@@ -223,10 +232,18 @@ window.initApp = async (db, auth, userId, appId, firebaseFirestore) => {
             }
         });
 
-        // Add new items to the list at the top to reflect reverse chronological order
+        // Remove old entries that are no longer in the fetched data (e.g., if deleted)
+        Array.from(sessionHistoryList.children).forEach(child => {
+            if (!renderedSessionIds.has(child.dataset.sessionId)) {
+                sessionHistoryList.removeChild(child);
+            }
+        });
+
+        // Append new items if any, or re-sort if necessary (simple prepend for new items is easier)
+        // For accurate chronological order when new items are added: clear and re-add all, or insert sort.
+        // For now, prepending new items as they appear from onSnapshot.
         sessionHistoryList.prepend(fragment);
     }
-
 
     // Event Listeners for main controls
     startBtn.addEventListener('click', startTimer);
@@ -272,10 +289,10 @@ window.initApp = async (db, auth, userId, appId, firebaseFirestore) => {
                 isPublicSession: isPublicSession,
                 lastUpdated: serverTimestamp()
             }, { merge: true });
-            showMessage("Settings saved successfully!");
+            window.showMessage("Settings saved successfully!");
         } catch (e) {
             console.error("Error saving preferences: ", e);
-            showMessage("Error saving settings.");
+            window.showMessage("Error saving settings.");
         }
 
         settingsModal.querySelector('.modal-content').classList.remove('scale-100', 'opacity-100');
@@ -303,11 +320,56 @@ window.initApp = async (db, auth, userId, appId, firebaseFirestore) => {
         }
     }
 
-    // Initial setup
+    // Initial UI setup
     pauseBtn.disabled = true; // Pause button is disabled initially
     resetBtn.disabled = true; // Reset button is disabled initially
 
     // Load preferences and then session history
     await loadUserPreferences();
     loadSessionHistory();
-};
+}
+
+// Global Firebase initialization and app runner
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+        if (!Object.keys(firebaseConfig).length) {
+            console.error("Firebase config is missing. Cannot initialize Firebase.");
+            window.showMessage('Error: Firebase configuration is missing. Please ensure it is provided.');
+            return;
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let currentUserId;
+
+        // Sign in anonymously if no token, otherwise use custom token
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            await signInAnonymously(auth);
+        }
+
+        // Listen for auth state changes and initialize the app
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUserId = user.uid;
+                console.log("Authenticated user ID:", currentUserId);
+                // Call initApp only after a user is confirmed
+                initApp(db, auth, currentUserId, appId);
+            } else {
+                console.log("No user signed in.");
+                document.getElementById('userIdDisplay').textContent = 'User ID: Not authenticated';
+                window.showMessage('Please sign in or allow anonymous access to use the app.');
+            }
+        });
+
+    } catch (error) {
+        console.error("Error during initial Firebase setup or authentication:", error);
+        window.showMessage('Error initializing application. Please try again later.');
+    }
+});
